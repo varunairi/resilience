@@ -28,6 +28,9 @@ public class EndpointController {
     @Resource(name = "slowCallCktBreakder")
     private CircuitBreakerRegistry registry;
 
+    @Resource(name="failedCallCktBreaker")
+    private CircuitBreakerRegistry failureCktBreakerRegistry;
+
 
 
     @GetMapping(path = "/status")
@@ -62,10 +65,30 @@ public class EndpointController {
         return  responseBody;
     }
 
+    @GetMapping(path="/serviceFailure")
+    public ResponseEntity simulateServiceFailure(String  id, boolean failInstance) throws Exception
+    {
+        CircuitBreaker circuitBreaker = this.failureCktBreakerRegistry.circuitBreaker("failedCktBreaker");
+
+        Supplier<String> ofService = ()-> {
+            try {
+                 serviceA.simlateFailedService(failInstance);
+            } catch (Exception e) {
+               throw new RuntimeException(e);
+            }
+            return "";
+        };
+        Supplier<String> decoratedService = Decorators.ofSupplier(ofService).withCircuitBreaker(circuitBreaker).decorate();
+        String message = Try.ofSupplier(decoratedService).recover(throwable ->"Failure: " + throwable.getLocalizedMessage()).get();
+        System.out.println(id + ":" + message);
+        ResponseEntity responseBody = new ResponseEntity<Status>(new Status("Success", message), HttpStatus.OK);
+        return  responseBody;
+    }
+
     @PostMapping(path="/changeCircuitState")
     public ResponseEntity closeCircuit(@RequestBody CircuitInfo cktInfo)
     {
-        CircuitBreaker circuitBreaker = registry.circuitBreaker("name");
+        CircuitBreaker circuitBreaker = registry.circuitBreaker(cktInfo.getCircuitName());
         if ("HalfOpen".equalsIgnoreCase(cktInfo.getCircuitState()))
             circuitBreaker.transitionToHalfOpenState();
         else if ("Closed".equalsIgnoreCase(cktInfo.getCircuitState()))

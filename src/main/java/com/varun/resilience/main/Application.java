@@ -22,28 +22,32 @@ public class Application {
     @Bean(name="slowCallCktBreakder")
     public CircuitBreakerRegistry getCktBreakerRegistry(){
 
-        CircuitBreakerConfig config = CircuitBreakerConfig.custom().slowCallDurationThreshold(Duration.ofSeconds(5))
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .slowCallDurationThreshold(Duration.ofSeconds(5)) //max wait time is 5 seconds
                 //  .failureRateThreshold(10)
-                .slowCallRateThreshold(30)
-                .minimumNumberOfCalls(1)
-                .slidingWindowSize(5)
-                .permittedNumberOfCallsInHalfOpenState(3)
-                //        .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                .slowCallRateThreshold(30) //if 30% or more calls are slower than  trigger Ckt Breaker
+                .minimumNumberOfCalls(1) //start ckt breaker to monitor after 1st call.
+                .slidingWindowSize(5)  //use the stats from 5 recent calls to calc stats to see threshold breached or not
+                .permittedNumberOfCallsInHalfOpenState(3) //when circuit is half open. how many calls to allow to gauge success
+                //        .automaticTransitionFromOpenToHalfOpenEnabled(true) //should open turn into half open after set time.
                 .build();
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
         return registry;
     }
 
 
-    @Bean(name="slowCallCktBreakderFailed")
-    CircuitBreaker getCircuitBreakerFailure(){
-        CircuitBreakerConfig config = CircuitBreakerConfig.custom().slowCallDurationThreshold(Duration.ofSeconds(5))
-                .failureRateThreshold(10)
-                .minimumNumberOfCalls(1)
+    @Bean(name="failedCallCktBreaker")
+    CircuitBreakerRegistry getCircuitBreakerRegistryForFailure(){
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .failureRateThreshold(30)
+                .minimumNumberOfCalls(2)
                 .slidingWindowSize(50)
+                .automaticTransitionFromOpenToHalfOpenEnabled(false)
+             //   .permittedNumberOfCallsInHalfOpenState(3)
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+        .waitDurationInOpenState(Duration.ofMinutes(2)) //how long the open state remains before moving to half open
                 .build();
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(config);
-        CircuitBreaker circuitBreaker = registry.circuitBreaker("name1");
-        return circuitBreaker;
+        return registry;
     }
 }

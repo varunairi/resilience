@@ -14,7 +14,8 @@ public String simulateSlowService(int delayInSecs){
     return "Success";
 }
 
-public void simlateFailedService()throws Exception{
-    throw new Exception();
+public void simlateFailedService(boolean throwException)throws Exception{
+    if(throwException)throw new Exception();
+
 }
 }

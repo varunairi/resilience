@@ -10,7 +10,10 @@ Here is what you need to check in the code.
  
  > The Application.java has a CircuitBreakerRegistry with CircuitBreakerConfig set to trigger whenever 30% of all calls in a "sliding window" of size 5 (most recent calls to downstream API) are slow (response time > 5 secs). The Circuit Breaker kicks in after a "minimum number of calls". The Service is /serviceTooSlow and to reset the circuit breaker is /changeCircuitState
 
-  - ***Example 2 - Service Call that regularly fails***: 
+  - ***Example 2 - Service Call that regularly fails***: This example shows when downstream API produces frequent failures / exceptions causing circuit to open. 
+  > The Application.java is injecting a bean for CircuitBreakerRegistry "*failedCallCktBreaker*" that configures the following parameters : Minimum number of calls to be made before cktbreaker kicks in, failure threshold in % of all calls (min calls described before too takes part in calculating stats),
+  sliding window size and type, and **waitDuration** which automatically resets from OPEN to HALF OPEN State (looks like automaticTransitionFromOpenToHalfOpenEnabled does not have an effect). The service is /serviceFailure and /changeCircuitState is used to reset the Ckt Breaker.
+  
 
 StackEdit stores your files in your browser, which means all your files are automatically saved locally and are accessible **offline!**
 
