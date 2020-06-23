@@ -25,7 +25,7 @@ protected API/method, you have to use other methods with it OR define Timeouts o
  > The RateLimiterGenerator.java has a RateLimitRegistry that allows 20 (limitForPeriod) requests in 5 secs (limitRefreshPeriod) and making any thread waiting more than 9 secs to timeout (timeoutDuration). 
     The Service /rateLimit/service calls the downstream service after decorating with RateLimiter. This is tested using Apache JMEter file (RateLimiter-TG) 
 
-## BulkHeads
+## Bulk Heads
 
 Bulk head essentially means separating failures. This can be done either by separating the consumer/client's requests to specific instances of a service OR at the client side by implementing separate thread pools for each service so that a slow/unresponsive/failed service does not overwhelm the client.
 There are 2 types of Bulkheads available: 
@@ -42,3 +42,25 @@ This example shows that the downstream API (if slow ) can be controlled to be ca
 This example shows that the downstream API  can be controlled to be called only for a set number of threads by client without tying all the resources up with that call. Any further calls to get concurrent connection are rejected after the bounded queue is full, immediately.
 > The BulkHeadGenerator.java has a ThreadPoolBulkheadRegistry that allows 5 core and 7 max threads with bounded queue set to 10 .  
     The Service /bulkhead/service (with param useTP=true) calls the downstream service after decorating with ThreadPoolBulkhead. This is tested using Apache JMEter file (Bulkhead-Threadpool-TG) .  I tested with 50 requests placed simultaneously to an API that had a 7 second delay that resulted in 17 requests to go through and all others failed.
+
+## Time Limiter
+
+Time Limiter is a timeout mechanism for a downstream call that is slow and raise a timely exception
+Here is explanation of code samples:
+- ***Example 1 - Timeout in a fixed number of time  and cancel future calls***: 
+> The TimeoutGenerator.java has a TimeoutRegistry that times out in 5 secs and cancels the task   
+    The Service /timeOut/service calls the downstream service after decorating with Timeout period
+
+## Retry
+
+Retry allows a functionality to retry a failure (failure could be an exception or a result from a API call)allowing fixed number of retries with either linear time delays or exponential backoffs
+
+- ***Example 1 - Retry with a fixed time interval***: 
+> The RetryGenerator.java has a RetryRegistry that retries thrice and retries on set of exceptions.   
+    The Service /retry/service calls the downstream service after decorating with Retry period
+
+- ***Example 2 - Retry with a exponential back off time interval***: 
+> The RetryGenerator.java has a RetryRegistry that retries thrice and retries on set of exceptions.   
+    The Service /retryBackOff/service calls the downstream service after decorating with Retry period
+
+@copyright: Varun

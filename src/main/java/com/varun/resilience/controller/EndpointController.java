@@ -14,6 +14,10 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.decorators.Decorators;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.github.resilience4j.timelimiter.TimeLimiter;
+import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import io.vavr.control.Try;
 import org.springframework.beans.factory.annotation.Required;
 import org.springframework.http.HttpStatus;
@@ -22,8 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.time.Duration;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -142,17 +145,14 @@ public class EndpointController {
         ThreadPoolBulkhead tpBh = this.tpBhRegistry.bulkhead("tpbh");
         String message ;
         if(useTP){
-            System.out.println(useTP);
             Integer isFailure = new Integer(0);
             Supplier<CompletionStage<String>> supplier = tpBh.decorateSupplier(()->this.serviceA.simulateSlowService(delayInSecs));
             //this throws BulkHeadFullException when queue is full.
             CompletionStage<String> compmessage = Try.ofSupplier(supplier).onFailure(throwable-> System.out.println("Failure ")).get();
 
             message = compmessage.toCompletableFuture().get();
-            if (message.startsWith("Failure")){
-                System.out.println(id + message);
+            if (message.startsWith("Failure"))
                 return  new ResponseEntity<Status>(new Status("failure", message), HttpStatus.EXPECTATION_FAILED);
-            }
         }
         else{
             Supplier<String> supplier =
@@ -164,5 +164,52 @@ public class EndpointController {
             }
         }
         return  new ResponseEntity<Status>(new Status("succes", message), HttpStatus.OK);
+    }
+
+    @Resource(name = "SimpleReg")
+    private RetryRegistry retryRegistry;
+    @GetMapping(path="/retry/service")
+    public ResponseEntity getUserDetailsWithRetry(@RequestParam int id)
+    {
+        Retry retry = this.retryRegistry.retry("simple");
+        Supplier<String> suppliers = Decorators.ofSupplier(()->serviceA.failRandomly(id)).withRetry(retry).decorate();
+        String message = Try.ofSupplier(suppliers).recover(throwable -> "Failure after Retries too").get();
+        if (message.startsWith("Failure"))
+            return new ResponseEntity(new Status("Failure", message), HttpStatus.BANDWIDTH_LIMIT_EXCEEDED);
+        return new ResponseEntity(new Status("Success", message), HttpStatus.OK);
+    }
+
+
+    @Resource(name = "WithExpBackoff")
+    private RetryRegistry retryWithBackoffRegistry;
+    @GetMapping(path="/retryBackOff/service")
+    public ResponseEntity getUserDetailsWithRetryBackOff(@RequestParam int id)
+    {
+        Retry retry = this.retryWithBackoffRegistry.retry("simple");
+        Supplier<String> suppliers = Decorators.ofSupplier(()->serviceA.failRandomlyAndGiveRandomResults(id)).withRetry(retry).decorate();
+        String message = Try.ofSupplier(suppliers).recover(throwable -> "Failure after Retries too").get();
+        if (message.startsWith("Failure") || message.startsWith("GoForRetry"))
+            return new ResponseEntity(new Status("Failure", message), HttpStatus.BANDWIDTH_LIMIT_EXCEEDED);
+        return new ResponseEntity(new Status("Success", message), HttpStatus.OK);
+    }
+
+
+    @Resource
+    private TimeLimiterRegistry timeLimiterRegistry;
+    @GetMapping(path="/timeOut/service")
+    public ResponseEntity getUserDetailsWithRetryBackOff(@RequestParam int id, @RequestParam int delayInSecs) throws Exception {
+        TimeLimiter timeLimiter = this.timeLimiterRegistry.timeLimiter("timeout");
+
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
+        // The non-blocking variant with a CompletableFuture
+        CompletableFuture<String> result = timeLimiter.executeCompletionStage(
+                scheduler, () -> CompletableFuture.supplyAsync(() -> serviceA.simulateSlowService(delayInSecs))).toCompletableFuture();
+
+//        timeLimiter.executeFutureSupplier(
+//                () -> CompletableFuture.supplyAsync(() ->  serviceA.simulateSlowService(delayInSecs)));
+        String message = result.get();
+        if (message.startsWith("Failure") || message.startsWith("GoForRetry"))
+            return new ResponseEntity(new Status("Failure", message), HttpStatus.BANDWIDTH_LIMIT_EXCEEDED);
+        return new ResponseEntity(new Status("Success", message), HttpStatus.OK);
     }
 }
