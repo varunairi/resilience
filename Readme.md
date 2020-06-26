@@ -29,7 +29,7 @@ protected API/method, you have to use other methods with it OR define Timeouts o
 
 Bulk head essentially means separating failures. This can be done either by separating the consumer/client's requests to specific instances of a service OR at the client side by implementing separate thread pools for each service so that a slow/unresponsive/failed service does not overwhelm the client.
 There are 2 types of Bulkheads available: 
- - Semaphore Based: Defines a behavior where max Concurrent Calls are allowed to a limit and you can reject any other threads that are waiting for attention more than a pre set time. 
+ - Semaphore Based: Defines a behavior where max Concurrent Calls are allowed to a limit and you can reject any other threads that are waiting for attention more than a pre set time OR immediately if maxWaitDuration is not defined. 
  - ThreadPool Based: Fixed Threadpool with Core and Max Thread Pools and a Bounded Queue. Anything above Bounded Queue Size is immediately rejected by BulkheadFullException
 
 Here is explanation of code samples:
